@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -eo pipefail; [[ $DOKKU_TRACE ]] && set -x
+source "$PLUGIN_CORE_AVAILABLE_PATH/common/functions"
 
 APP="$1"; APP_ROOT="$DOKKU_ROOT/$APP"
 [[ -z $(stat -t "$APP_ROOT"/CONTAINER.* 2>/dev/null) ]] && exit 0
@@ -8,9 +9,13 @@ for container in "$APP_ROOT"/CONTAINER.*; do
   NAME="$APP.$DYNO"
   PREVIOUS=$(docker ps -a -q -f name="^.?$NAME\$") || true
   if [[ -n $PREVIOUS ]]; then
-    docker rename "$NAME" "$NAME.$(date +%s)" > /dev/null
+    CONTAINER_DATE_NAME="$NAME.$(date +%s)"
+    dokku_log_info2_quiet "Found $PREVIOUS container"
+    dokku_log_info2_quiet "renaming container: $NAME to $CONTAINER_DATE_NAME"
+    docker rename "$NAME" "$CONTAINER_DATE_NAME" > /dev/null || (docker ps -a; docker ps -a | grep "$NAME"; exit 1)
   fi
   ID=$(cat "$container")
   CURRENT_NAME=$(docker inspect -f '{{.Name}}' "$ID" | tr -d /)
-  docker rename "$CURRENT_NAME" "$NAME" > /dev/null
+  dokku_log_info2_quiet "renaming container: $CURRENT_NAME to $NAME"
+  docker rename "$CURRENT_NAME" "$NAME" > /dev/null || (docker ps -a; docker ps -a | grep "$CURRENT_NAME"; exit 1)
 done
